@@ -66,11 +66,20 @@ def AI_sleeep(cap):
         adjusted_threshold = base_threshold * (1 + (1 - face_ratio))
         return max(0.15, min(adjusted_threshold, 0.3))
 
-    # while cap.isOpened():
-    start_time = time.time()
-    success, frame = cap.read()
+    # เพิ่มสถานะเริ่มต้น (จะอัปเดตทุกเฟรม)
+    final_status = {
+        "drowsy": False,
+        "yawning": False,
+        "microsleep": False
+    }
 
-    if success:
+    while cap.isOpened():  # ✅ ใช้ while เพื่อประมวลผลต่อเนื่องหลายเฟรม
+        start_time = time.time()
+        success, frame = cap.read()
+
+        if not success:
+            break
+
         frame = cv2.flip(frame, 1)
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         face_results = face_mesh.process(rgb_frame)
@@ -128,7 +137,9 @@ def AI_sleeep(cap):
                         2
                     )
 
+                    # ตรวจง่วง
                     if avg_ear < ear_threshold:
+                        final_status["drowsy"] = True
                         cv2.putText(
                             annotated_frame,
                             "DROWSINESS DETECTED!",
@@ -139,29 +150,33 @@ def AI_sleeep(cap):
                             2
                         )
 
+                    # ตรวจ Microsleep
                     left_iris_center = get_iris_center(face_landmarks.landmark, LEFT_IRIS)
                     right_iris_center = get_iris_center(face_landmarks.landmark, RIGHT_IRIS)
                     iris_center_avg = ((left_iris_center[0] + right_iris_center[0]) / 2,
-                                    (left_iris_center[1] + right_iris_center[1]) / 2)
+                                       (left_iris_center[1] + right_iris_center[1]) / 2)
 
                     iris_history.append(iris_center_avg)
                     if len(iris_history) > iris_window_size:
                         iris_history.pop(0)
 
                     if is_iris_stationary(iris_history):
+                        final_status["microsleep"] = True
                         cv2.putText(
                             annotated_frame,
                             "MICROSLEEP DETECTED!",
                             (10, 130),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.6,
-                            (0, 165, 255),  # สีส้ม
+                            (0, 165, 255),
                             2
                         )
 
+                    # ตรวจหาว
                     if smoothed_mar > MAR_THRESHOLD:
                         yawn_frames += 1
                         if yawn_frames > 10:
+                            final_status["yawning"] = True
                             cv2.putText(
                                 annotated_frame,
                                 "YAWNING DETECTED!",
@@ -173,34 +188,12 @@ def AI_sleeep(cap):
                             )
                     else:
                         yawn_frames = 0
-                    
-                    # สร้างสถานะที่จะรีเทิร์น
-                    final_status = {
-                        "drowsy": False,
-                        "yawning": False,
-                        "microsleep": False
-                    }
-
-                    # ตรวจสอบว่ามีการตรวจจับแต่ละอย่างหรือไม่
-                    if avg_ear < ear_threshold:
-                        final_status["drowsy"] = True
-                    if smoothed_mar > MAR_THRESHOLD and yawn_frames > 10:
-                        final_status["yawning"] = True
-                    if is_iris_stationary(iris_history):
-                        final_status["microsleep"] = True
-
-                    cap.release()
-                    cv2.destroyAllWindows()
-                    return final_status
 
                 except IndexError:
                     print("Index out of range, skipping this face.")
 
         elapsed_time = time.time() - start_time
-        fps = 1 / elapsed_time
-
-        avg_ear = 1.0
-        smoothed_mar = 0.0
+        fps = 1 / elapsed_time if elapsed_time > 0 else 0
 
         cv2.putText(
             annotated_frame,
@@ -211,11 +204,14 @@ def AI_sleeep(cap):
             (255, 255, 0),
             2
         )
+
         cv2.imshow("Face, Eye & Yawn Detection", annotated_frame)
 
-    #         if cv2.waitKey(1) & 0xFF == ord("q"):
-    #             break
-    #     else:
-    #         break
-    # cap.release()
-    # cv2.destroyAllWindows()
+        if cv2.waitKey(1) & 0xFF == ord("q"):  # กด q เพื่อออก
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+    # ✅ Return สถานะล่าสุดที่ตรวจได้หลังจบทั้งหมด
+    return final_status
