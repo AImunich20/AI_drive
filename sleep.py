@@ -1,12 +1,19 @@
-def AI_sleeep(cap):
-    import cv2
-    import mediapipe as mp
-    import numpy as np
-    import time
+import cv2
+import mediapipe as mp
+import numpy as np
+import time
 
-    mp_face_mesh = mp.solutions.face_mesh
+def AI_sleeep(cap,mp_face_mesh):
+    # mp_face_mesh = mp.solutions.face_mesh
     face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.6, min_tracking_confidence=0.6)
 
+    # สร้างสถานะที่จะรีเทิร์น
+    final_status = {
+        "drowsy": False,
+        "yawning": False,
+        "microsleep": False
+    }
+    
     LEFT_EYE = [33, 160, 158, 133, 153, 144, 145, 23, 24]
     RIGHT_EYE = [362, 385, 387, 263, 373, 380, 374, 253, 254]
     UPPER_LIP = [61, 62, 63, 64, 65, 66]
@@ -66,20 +73,11 @@ def AI_sleeep(cap):
         adjusted_threshold = base_threshold * (1 + (1 - face_ratio))
         return max(0.15, min(adjusted_threshold, 0.3))
 
-    # เพิ่มสถานะเริ่มต้น (จะอัปเดตทุกเฟรม)
-    final_status = {
-        "drowsy": False,
-        "yawning": False,
-        "microsleep": False
-    }
+    # while cap.isOpened():
+    start_time = time.time()
+    success, frame = cap.read()
 
-    while cap.isOpened():  # ✅ ใช้ while เพื่อประมวลผลต่อเนื่องหลายเฟรม
-        start_time = time.time()
-        success, frame = cap.read()
-
-        if not success:
-            break
-
+    if success:
         frame = cv2.flip(frame, 1)
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         face_results = face_mesh.process(rgb_frame)
@@ -137,7 +135,6 @@ def AI_sleeep(cap):
                         2
                     )
 
-                    # ตรวจง่วง
                     if avg_ear < ear_threshold:
                         final_status["drowsy"] = True
                         cv2.putText(
@@ -150,11 +147,10 @@ def AI_sleeep(cap):
                             2
                         )
 
-                    # ตรวจ Microsleep
                     left_iris_center = get_iris_center(face_landmarks.landmark, LEFT_IRIS)
                     right_iris_center = get_iris_center(face_landmarks.landmark, RIGHT_IRIS)
                     iris_center_avg = ((left_iris_center[0] + right_iris_center[0]) / 2,
-                                       (left_iris_center[1] + right_iris_center[1]) / 2)
+                                    (left_iris_center[1] + right_iris_center[1]) / 2)
 
                     iris_history.append(iris_center_avg)
                     if len(iris_history) > iris_window_size:
@@ -168,15 +164,14 @@ def AI_sleeep(cap):
                             (10, 130),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.6,
-                            (0, 165, 255),
+                            (0, 165, 255),  # สีส้ม
                             2
                         )
 
-                    # ตรวจหาว
                     if smoothed_mar > MAR_THRESHOLD:
+                        final_status["yawning"] = True
                         yawn_frames += 1
                         if yawn_frames > 10:
-                            final_status["yawning"] = True
                             cv2.putText(
                                 annotated_frame,
                                 "YAWNING DETECTED!",
@@ -189,11 +184,26 @@ def AI_sleeep(cap):
                     else:
                         yawn_frames = 0
 
+                    # # ตรวจสอบว่ามีการตรวจจับแต่ละอย่างหรือไม่
+                    # if avg_ear < ear_threshold:
+                    #     final_status["drowsy"] = True
+                    # if smoothed_mar > MAR_THRESHOLD and yawn_frames > 10:
+                    #     final_status["yawning"] = True
+                    # if is_iris_stationary(iris_history):
+                    #     final_status["microsleep"] = True
+
+                    # cap.release()
+                    # cv2.destroyAllWindows()
+                    
+
                 except IndexError:
                     print("Index out of range, skipping this face.")
 
         elapsed_time = time.time() - start_time
-        fps = 1 / elapsed_time if elapsed_time > 0 else 0
+        fps = 1 / elapsed_time
+
+        avg_ear = 1.0
+        smoothed_mar = 0.0
 
         cv2.putText(
             annotated_frame,
@@ -204,14 +214,11 @@ def AI_sleeep(cap):
             (255, 255, 0),
             2
         )
-
         cv2.imshow("Face, Eye & Yawn Detection", annotated_frame)
-
-        if cv2.waitKey(1) & 0xFF == ord("q"):  # กด q เพื่อออก
-            break
-
+        return final_status
+    #         if cv2.waitKey(1) & 0xFF == ord("q"):
+    #             break
+    #     else:
+    #         break
     cap.release()
     cv2.destroyAllWindows()
-
-    # ✅ Return สถานะล่าสุดที่ตรวจได้หลังจบทั้งหมด
-    return final_status

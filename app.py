@@ -6,6 +6,7 @@ import cv2
 import threading
 import time
 from ultralytics import YOLO
+import mediapipe as mp
 
 model = YOLO("yolo11n.pt")
 
@@ -22,15 +23,18 @@ if __name__ == '__main__':
 
     last_detection_time = 0
 
+    mp_face_mesh = mp.solutions.face_mesh
+
     try:
         while True:
             current_time = time.time()
 
             if shared_state["value"] == 1:
-                AI_sleeep(cap)
+                status = AI_sleeep(cap,mp_face_mesh)
+                print(status)
 
             elif shared_state["value"] == 2:
-                frame, status, last_detection_time, already_alerted = car(cap2, model, current_time, last_detection_time)
+                frame, status, last_detection_time, already_alerted = car(cap, model, current_time, last_detection_time)
 
                 if status == "have people":
                     if already_alerted and not has_sent_alert:
