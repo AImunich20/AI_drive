@@ -16,7 +16,7 @@ LINE_API_PUSH_URL = 'https://api.line.me/v2/bot/message/push'
 # ตั้งค่าพื้นฐาน
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-LINE_USER_ID = "Uc4e322ac25cee130bb2cf3e2ce06d2db"  # 👈 ใส่ userId ของคุณเองที่ต้องการให้ push ไปหา
+LINE_USER_ID = "Uc4e322ac25cee130bb2cf3e2ce06d2db"
 
 # ตรวจสอบลายเซ็นจาก LINE
 def verify_signature(request):
@@ -75,7 +75,6 @@ def webhook():
 
     return 'OK'
 
-# ✅ รับภาพและข้อความจาก POST /IN
 @app.route("/IN", methods=["POST"])
 def receive_image():
     try:
@@ -87,11 +86,9 @@ def receive_image():
             save_path = os.path.join(UPLOAD_FOLDER, filename)
             image.save(save_path)
 
-            # 🔗 เปลี่ยน URL นี้ให้ตรงกับที่สามารถเข้าถึงได้จริง เช่นผ่าน pitunnel หรือ public IP
             base_url = "https://line-natthanat.as2.pitunnel.net"
             image_url = f"{base_url}/{UPLOAD_FOLDER}/{filename}"
 
-            # ✅ ส่งภาพและข้อความไป LINE
             push_message(message)
             push_image(image_url)
 
