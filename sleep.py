@@ -4,7 +4,7 @@ import numpy as np
 import time
 
 def AI_sleeep(cap,mp_face_mesh):
-    # mp_face_mesh = mp.solutions.face_mesh
+    mp_face_mesh = mp.solutions.face_mesh
     face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.6, min_tracking_confidence=0.6)
 
     # สร้างสถานะที่จะรีเทิร์น
